@@ -1,5 +1,5 @@
 #!/bin/sh
-#wget -q "--no-check-certificate" http://ipkinstall.ath.cx/ipaudio/installer.sh -O - | /bin/sh
+#wget -q "--no-check-certificate" https://raw.githubusercontent.com/emil237/ipaudio/main/installer.sh -O - | /bin/sh
 ######### Only These two lines to edit with new version ######
 version=6.6
 description="Player Update"
@@ -35,7 +35,7 @@ fi
 
 cd $TEMPATH
 set -e
-wget -q "http://ipkinstall.ath.cx/ipaudio/ipaudio-$version.tar.gz"
+wget -q "https://raw.githubusercontent.com/emil237/ipaudio/main/ipaudio-$version.tar.gz"
 
 tar -xzf ipaudio-"$version".tar.gz -C /tmp
 set +e
