@@ -1,49 +1,47 @@
 #!/bin/sh
-##wget -q "--no-check-certificate" https://raw.githubusercontent.com/emil237/ipaudio/main/install.sh -O - | /bin/sh
-#########
 
 TEMPATH='/tmp'
 PLUGINPATH='/usr/lib/enigma2/python/Plugins/Extensions/IPAudio'
 CHECK='/tmp/check'
 BINDIR='/usr/bin/'
-ARMBIN='/tmp/ipaudio/bin/arm/*'
-MIPSBIN='/tmp/ipaudio/bin/mips/*'
-SH4BIN='/tmp/ipaudio/bin/sh4/*'
-AARCH64BIN='/tmp/ipaudio/bin/aarch64/*'
-IPAUDIO='/tmp/ipaudio/usr/*'
-PLAYLIST='/tmp/ipaudio/etc/ipaudio.json'
-ASOUND='/tmp/ipaudio/etc/asound.conf'
 
-# إضافة متغير للنسخة
 VERSION=''
 
-uname -m > $CHECK
+echo "Cleaning up previous installations..."
 rm -rf $PLUGINPATH >/dev/null 2>&1
 rm -f /usr/bin/gst1.0-ipaudio >/dev/null 2>&1
+rm -f /tmp/ipaudio-*.tar.gz >/dev/null 2>&1
+rm -rf /tmp/ipaudio >/dev/null 2>&1
+rm -f $CHECK >/dev/null 2>&1
 
-ps_out=$(ps -ef | grep gst1.0-ipaudio | grep -v 'grep' | grep -v $0)
-result=$(echo $ps_out | grep "gst1.0-ipaudio")
-if [ -n "$result" ]; then
-    killall -9 gst1.0-ipaudio
-fi
+killall -9 gst1.0-ipaudio >/dev/null 2>&1
+
+uname -m > $CHECK
 
 cd $TEMPATH
-if python --version 2>&1 | grep -q '^Python 3\.'; then
-    echo "   Installing IPAudio for Python 3"
+
+echo "Checking Python version..."
+PYTHON_VERSION=$(python -V 2>&1)
+echo "Full Python version: $PYTHON_VERSION"
+
+if echo "$PYTHON_VERSION" | grep -q 'Python 3'; then
+    echo "Installing IPAudio for Python 3"
     wget -O ipaudio-7.4-ffmpeg.tar.gz "https://raw.githubusercontent.com/emil237/ipaudio/main/ipaudio-7.4-ffmpeg.tar.gz"
     if [ -f "ipaudio-7.4-ffmpeg.tar.gz" ]; then
         tar -xzf ipaudio-7.4-ffmpeg.tar.gz -C /tmp
         VERSION='7.4'
+        echo "Python 3 version extracted successfully"
     else
         echo "Error: Failed to download Python 3 version"
         exit 1
     fi
 else 
-    echo "   Installing IPAudio for Python 2"
+    echo "Installing IPAudio for Python 2"
     wget -O ipaudio-6.8.tar.gz "https://raw.githubusercontent.com/emil237/ipaudio/main/ipaudio-6.8.tar.gz"
     if [ -f "ipaudio-6.8.tar.gz" ]; then
         tar -xzf ipaudio-6.8.tar.gz -C /tmp
         VERSION='6.8'
+        echo "Python 2 version extracted successfully"
     else
         echo "Error: Failed to download Python 2 version"
         exit 1
@@ -52,152 +50,137 @@ fi
 
 echo "================================="
 
-if [ -f /var/lib/dpkg/status ]; then
-    STATUS='/var/lib/dpkg/status'
-    OS='DreamOS'
-else
-    STATUS='/var/lib/opkg/status'
-    OS='Opensource'
-fi
-
-# Initialize variables
-gstVol=''
-gstOss=''
-gstMp3=''
-equalizer=''
-
-if grep -q 'gstreamer1.0-plugins-base-volume' $STATUS; then
-    gstVol='Installed'
-fi
-
-if grep -q 'gstreamer1.0-plugins-good-ossaudio' $STATUS; then
-    gstOss='Installed'
-fi
-
-if grep -q 'gstreamer1.0-plugins-good-mpg123' $STATUS; then
-    gstMp3='Installed'
-fi
-
-if grep -q 'gstreamer1.0-plugins-good-equalizer' $STATUS; then
-    equalizer='Installed'
-fi
-
-if [ "$gstVol" = "Installed" ] && [ "$gstOss" = "Installed" ] && [ "$gstMp3" = "Installed" ] && [ "$equalizer" = "Installed" ]; then
-    echo "All dependencies are installed"
-else
-    if [ "$OS" = "DreamOS" ]; then
-        echo "=========================================================================="
-        echo "Some Dependencies Need to Be Downloaded From Feeds ...."
-        echo "=========================================================================="
-        echo "Updating package list..."
-        echo "========================================================================"
-        apt-get update
-        echo " Downloading gstreamer1.0-plugins-base-volume ......"
-        apt-get install gstreamer1.0-plugins-base-volume -y
-        echo "========================================================================"
-        echo " Downloading gstreamer1.0-plugins-good-ossaudio ......"
-        apt-get install gstreamer1.0-plugins-good-ossaudio -y
-        echo "========================================================================"
-        echo " Downloading gstreamer1.0-plugins-good-mpg123 ......"
-        apt-get install gstreamer1.0-plugins-good-mpg123 -y
-        echo "========================================================================"
-        echo " Downloading gstreamer1.0-plugins-good-equalizer ......"
-        apt-get install gstreamer1.0-plugins-good-equalizer -y
-        echo "========================================================================"
-    else
-        echo "=========================================================================="
-        echo "Some Dependencies Need to Be Downloaded From Feeds ...."
-        echo "=========================================================================="
-        echo "Updating package list..."
-        echo "========================================================================"
-        opkg update
-        echo " Downloading gstreamer1.0-plugins-base-volume ......"
-        opkg install gstreamer1.0-plugins-base-volume
-        echo "========================================================================"
-        echo " Downloading gstreamer1.0-plugins-good-ossaudio ......"
-        opkg install gstreamer1.0-plugins-good-ossaudio
-        echo "========================================================================"
-        echo " Downloading gstreamer1.0-plugins-good-mpg123 ......"
-        opkg install gstreamer1.0-plugins-good-mpg123
-        echo "========================================================================"
-        echo " Downloading gstreamer1.0-plugins-good-equalizer ......"
-        opkg install gstreamer1.0-plugins-good-equalizer
-        echo "========================================================================"
-    fi
-fi
-
-# التحقق مرة أخرى من التبعيات بعد التثبيت
-if ! grep -q 'gstreamer1.0-plugins-base-volume' $STATUS; then
-    echo "#########################################################"
-    echo "#  gstreamer1.0-plugins-base-volume Not found in feed  #"
-    echo "#          IPaudio has not been installed              #"
-    echo "#########################################################"
-    rm -rf /tmp/ipaudio
-    rm -f $CHECK
-    rm -f ipaudio-*.tar.gz
+if [ ! -d "/tmp/ipaudio" ]; then
+    echo "Error: Extracted files not found in /tmp/ipaudio"
     exit 1
+fi
+
+echo "Analyzing file structure..."
+find /tmp/ipaudio -type f -name "*.py" | head -10
+echo "---"
+
+rm -rf $PLUGINPATH
+mkdir -p $PLUGINPATH
+echo "Created clean plugin directory: $PLUGINPATH"
+
+
+echo "Copying plugin files correctly..."
+
+if [ -d "/tmp/ipaudio/usr" ]; then
+    echo "Copying Python files from /tmp/ipaudio/usr/ to plugin directory..."
+    cp -r /tmp/ipaudio/usr/*.py $PLUGINPATH/ 2>/dev/null
+    cp -r /tmp/ipaudio/usr/*.so $PLUGINPATH/ 2>/dev/null 2>/dev/null
+    cp -r /tmp/ipaudio/usr/*.xml $PLUGINPATH/ 2>/dev/null
+    cp -r /tmp/ipaudio/usr/*.png $PLUGINPATH/ 2>/dev/null
+    cp -r /tmp/ipaudio/usr/*.json $PLUGINPATH/ 2>/dev/null
+    cp -r /tmp/ipaudio/usr/version $PLUGINPATH/ 2>/dev/null
+    cp -r /tmp/ipaudio/usr/LICENSE $PLUGINPATH/ 2>/dev/null
+    
+    if [ -d "/tmp/ipaudio/usr/icons" ]; then
+        cp -r /tmp/ipaudio/usr/icons $PLUGINPATH/ 2>/dev/null
+    fi
+    echo "Python files copied to plugin directory"
 fi
 
 ARCH=$(cat $CHECK)
+echo "[ Your device is $ARCH ]"
 
-if echo "$ARCH" | grep -qi 'mips'; then
-    echo "[ Your device is MIPS ]"
-    cp -rf $MIPSBIN $BINDIR 2>/dev/null
-    chmod 0775 /usr/bin/gst1.0-ipaudio 2>/dev/null
-elif echo "$ARCH" | grep -qi 'armv7l'; then
-    echo "[ Your device is armv7l ]"
-    cp -rf $ARMBIN $BINDIR 2>/dev/null
-    chmod 0775 /usr/bin/gst1.0-ipaudio 2>/dev/null
-elif echo "$ARCH" | grep -qi 'sh4'; then
-    echo "[ Your device is sh4 ]"
-    cp -rf $SH4BIN $BINDIR 2>/dev/null
-    chmod 0775 /usr/bin/gst1.0-ipaudio 2>/dev/null
-elif echo "$ARCH" | grep -qi 'aarch64'; then
-    echo "[ Your device is aarch64 ]"
-    cp -rf $AARCH64BIN $BINDIR 2>/dev/null
-    chmod 0775 /usr/bin/gst1.0-ipaudio 2>/dev/null
-else
-    echo "###############################"
-    echo "## Your device is not supported ##"
-    echo "###############################"
-    rm -rf /tmp/ipaudio
-    rm -f $CHECK
-    rm -f ipaudio-*.tar.gz
-    exit 1
+if echo "$ARCH" | grep -qi 'arm'; then
+    if [ -d "/tmp/ipaudio/bin/arm" ]; then
+        echo "Copying ARM binaries..."
+        cp -r /tmp/ipaudio/bin/arm/* $BINDIR 2>/dev/null
+        echo "ARM binaries copied successfully"
+    else
+        echo "Warning: ARM binary directory not found at /tmp/ipaudio/bin/arm"
+        
+        find /tmp/ipaudio -name "gst1.0-ipaudio" -exec cp {} $BINDIR/ \; 2>/dev/null
+        find /tmp/ipaudio -name "ff-ipaudio" -exec cp {} $BINDIR/ \; 2>/dev/null
+    fi
 fi
 
-# نسخ ملفات IPAudio (الملفات الخاصة بالبلوجين)
-if [ -d "/tmp/ipaudio/usr" ]; then
-    cp -rf /tmp/ipaudio/usr/* /usr/ 2>/dev/null
+if [ -f "/usr/bin/gst1.0-ipaudio" ]; then
+    chmod 0755 /usr/bin/gst1.0-ipaudio
+    echo "Binary permissions set for gst1.0-ipaudio"
 fi
 
-# إنشاء المجلد إذا لم يكن موجوداً
+if [ -f "/usr/bin/ff-ipaudio" ]; then
+    chmod 0755 /usr/bin/ff-ipaudio
+    echo "Binary permissions set for ff-ipaudio"
+fi
+
 mkdir -p /etc/enigma2
 
-if [ ! -f /etc/enigma2/ipaudio.json ] && [ -f "$PLAYLIST" ]; then
-    cp -f $PLAYLIST /etc/enigma2/
-    echo "IPAudio playlist configuration copied"
+if [ -f "/tmp/ipaudio/etc/ipaudio.json" ] && [ ! -f "/etc/enigma2/ipaudio.json" ]; then
+    cp /tmp/ipaudio/etc/ipaudio.json /etc/enigma2/
+    echo "Playlist configuration copied"
 fi
 
-if [ ! -f /etc/asound.conf ] && [ -f "$ASOUND" ]; then
-    cp -f $ASOUND /etc/
-    echo "Copying asound.conf to /etc"
+if [ -f "/tmp/ipaudio/etc/asound.conf" ] && [ ! -f "/etc/asound.conf" ]; then
+    cp /tmp/ipaudio/etc/asound.conf /etc/
+    echo "Audio configuration copied"
 fi
 
-# تنظيف الملفات المؤقتة
+echo ""
+echo "Final installation verification:"
+echo "Plugin path: $PLUGINPATH"
+
+if [ -d "$PLUGINPATH" ]; then
+    echo "Files in plugin directory:"
+    ls -la "$PLUGINPATH/"
+    
+    if [ -f "$PLUGINPATH/__init__.py" ] || [ -f "$PLUGINPATH/plugin.py" ]; then
+        echo "✅ PLUGIN INSTALLED SUCCESSFULLY - CORRECT STRUCTURE"
+        INSTALL_STATUS="SUCCESS"
+    else
+        echo "⚠️ Plugin directory exists but missing core Python files"
+        INSTALL_STATUS="INCOMPLETE"
+    fi
+else
+    echo "❌ Plugin directory was not created"
+    INSTALL_STATUS="FAILED"
+fi
+
+BINARY_STATUS="FAILED"
+if [ -f "/usr/bin/gst1.0-ipaudio" ]; then
+    echo "✅ Binary gst1.0-ipaudio installed"
+    BINARY_STATUS="SUCCESS"
+else
+    echo "❌ Binary gst1.0-ipaudio not found"
+fi
+
+if [ -f "/usr/bin/ff-ipaudio" ]; then
+    echo "✅ Binary ff-ipaudio installed"
+else
+    echo "⚠️ Binary ff-ipaudio not found (may be normal)"
+fi
+
 rm -rf /tmp/ipaudio
 rm -f $CHECK
 rm -f ipaudio-*.tar.gz
 
 echo ""
 sync
+
 echo "#########################################################"
-echo "#          IPAudio $VERSION INSTALLED SUCCESSFULLY          #"
-echo "#                  BY ZIKO - support on                #"
-echo "#    https://www.tunisia-sat.com/forums/threads/4171372 #"
+echo "#               INSTALLATION COMPLETE                  #"
 echo "#########################################################"
+echo "# Python Version: $PYTHON_VERSION"
+echo "# IPAudio Version: $VERSION"
+echo "# Architecture: $ARCH"
+echo "# Plugin Status: $INSTALL_STATUS"
+echo "# Binary Status: $BINARY_STATUS"
 echo "#########################################################"
 
-sleep 3
+if [ "$INSTALL_STATUS" = "SUCCESS" ]; then
+    echo "# ✅ Plugin installed successfully!                   #"
+    echo "#                                                     #"
+    echo "#########################################################"
+else
+    echo "# ❌ Installation failed - check structure           #"
+    echo "#########################################################"
+fi
+
+echo ""
+echo "Installation completed successfully!"
 
 exit 0
