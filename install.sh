@@ -1,5 +1,6 @@
 #!/bin/sh
-
+#wget -q "--no-check-certificate" https://raw.githubusercontent.com/emil237/ipaudio/refs/heads/main/install.sh -O - | /bin/sh
+#########
 TEMPATH='/tmp'
 PLUGINPATH='/usr/lib/enigma2/python/Plugins/Extensions/IPAudio'
 CHECK='/tmp/check'
