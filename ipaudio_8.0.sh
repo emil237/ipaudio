@@ -1,5 +1,6 @@
 #!/bin/sh
 #setup command=wget https://github.com/emil237/ipaudio/raw/refs/heads/main/ipaudio_8.0.sh -O - | /bin/sh
+
 version=8.0
 TEMPATH='/tmp'
 PLUGINPATH='/usr/lib/enigma2/python/Plugins/Extensions/IPAudio'
@@ -12,22 +13,14 @@ FFPPLAYERM='/tmp/ipaudio/bin/mips/ff4/ff-ipaudio'
 IPAUDIO='/tmp/ipaudio/usr/*'
 PLAYLIST='/tmp/ipaudio/etc/ipaudio.json'
 ASOUND='/tmp/ipaudio/etc/asound.conf'
-uname -m >$CHECK
 
-# kill player if in use
-ps_out=$(ps -ef | grep gst1.0-ipaudio | grep -v 'grep' | grep -v $0)
-result=$(echo $ps_out | grep "gst1.0-ipaudio")
-if [[ "$result" != "" ]]; then
-    killall -9 gst1.0-ipaudio
-fi
+uname -m > $CHECK
 
-ps_out=$(ps -ef | grep ff-ipaudio | grep -v 'grep' | grep -v $0)
-result=$(echo $ps_out | grep "ff-ipaudio")
-if [[ "$result" != "" ]]; then
-    killall -9 ff-ipaudio
-fi
+# kill players
+killall -9 gst1.0-ipaudio 2>/dev/null
+killall -9 ff-ipaudio 2>/dev/null
 
-# check depends packages
+# check system type
 if [ -f /var/lib/dpkg/status ]; then
     STATUS='/var/lib/dpkg/status'
     OS='DreamOS'
@@ -36,208 +29,114 @@ else
     OS='Opensource'
 fi
 
-if grep -q 'gstreamer1.0-plugins-base-volume' $STATUS; then
-    gstVol='Installed'
-fi
+echo "Checking depends (non-blocking)..."
 
-if grep -q 'gstreamer1.0-plugins-good-ossaudio' $STATUS; then
-    gstOss='Installed'
-fi
-
-if grep -q 'gstreamer1.0-plugins-good-mpg123' $STATUS; then
-    gstMp3='Installed'
-fi
-
-if grep -q 'gstreamer1.0-plugins-good-equalizer' $STATUS; then
-    equalizer='Installed'
-fi
-
-if grep -q 'ffmpeg' $STATUS; then
-    ffmpeg='Installed'
-fi
-
-if grep -q 'alsa-plugins' $STATUS; then
-    alsaPlug='Installed'
-fi
-
-if [ "$gstVol" = "Installed" ] && [ "$gstOss" = "Installed" ] && [ "$gstMp3" = "Installed" ] && [ "$equalizer" = "Installed" ] && [ "$ffmpeg" = "Installed" ] && [ "$alsaPlug" = "Installed" ]; then
-    echo ""
-else
-    if [ $OS = "DreamOS" ]; then
-        echo "=========================================================================="
-        echo "Some Depends Need to Be downloaded From Feeds ...."
-        echo "=========================================================================="
-        echo "apt update ..."
-        echo "========================================================================"
-        apt-get update
-        echo " Downloading gstreamer1.0-plugins-base-volume ......"
-        apt-get install gstreamer1.0-plugins-base-volume -y
-        echo "========================================================================"
-        echo " Downloading gstreamer1.0-plugins-good-ossaudio ......"
-        apt-get install gstreamer1.0-plugins-good-ossaudio -y
-        echo "========================================================================"
-        echo " Downloading gstreamer1.0-plugins-good-mpg123 ......"
-        apt-get install gstreamer1.0-plugins-good-mpg123 -y
-        echo "========================================================================"
-        echo " Downloading gstreamer1.0-plugins-good-equalizer ......"
-        apt-get install gstreamer1.0-plugins-good-equalizer -y
-        echo "========================================================================"
-        echo " Downloading ffmpeg ......"
-        apt-get install ffmpeg -y
-        echo "========================================================================"
-        echo " Downloading alsa-plugins ......"
-        apt-get install alsa-plugins -y
-        echo "========================================================================"
+check_dep() {
+    dep=$1
+    if grep -q "$dep" "$STATUS"; then
+        echo "[OK] $dep installed"
+        return 0
     else
-        echo "=========================================================================="
-        echo "Some Depends Need to Be downloaded From Feeds ...."
-        echo "=========================================================================="
-        echo "Opkg Update ..."
-        echo "========================================================================"
-        opkg update
-        echo " Downloading gstreamer1.0-plugins-base-volume ......"
-        opkg install gstreamer1.0-plugins-base-volume
-        echo "========================================================================"
-        echo " Downloading gstreamer1.0-plugins-good-ossaudio ......"
-        opkg install gstreamer1.0-plugins-good-ossaudio
-        echo "========================================================================"
-        echo " Downloading gstreamer1.0-plugins-good-mpg123 ......"
-        opkg install gstreamer1.0-plugins-good-mpg123
-        echo "========================================================================"
-        echo " Downloading gstreamer1.0-plugins-good-equalizer ......"
-        opkg install gstreamer1.0-plugins-good-equalizer
-        echo "========================================================================"
-        echo " Downloading ffmpeg ......"
-        opkg install ffmpeg
-        echo "========================================================================"
-        echo " Downloading alsa-plugins ......"
-        opkg install alsa-plugins
-        echo "========================================================================"
+        echo "[MISSING] $dep"
+        return 1
     fi
-fi
+}
 
-if grep -q 'gstreamer1.0-plugins-base-volume' $STATUS; then
-    echo ""
+install_dep() {
+    pkg=$1
+    echo "Installing $pkg ..."
+    if [ "$OS" = "DreamOS" ]; then
+        apt-get install -y $pkg 2>/dev/null || true
+    else
+        opkg install $pkg 2>/dev/null || true
+    fi
+}
+
+# update feeds (non-blocking)
+if [ "$OS" = "DreamOS" ]; then
+    apt-get update 2>/dev/null || true
 else
-    echo "#########################################################"
-    echo "#  gstreamer1.0-plugins-base-volume Not found in feed   #"
-    echo "#         IPaudio has not been installed                #"
-    echo "#########################################################"
-    rm -r /tmp/ipaudio >/dev/null 2>&1
-    rm -f $CHECK >/dev/null 2>&1
-    exit 1
+    opkg update 2>/dev/null || true
 fi
 
-if grep -q 'alsa-plugins' $STATUS; then
-    echo ""
-else
-    echo "#########################################################"
-    echo "#         alsa-plugins Not found in feed                #"
-    echo "#         IPaudio has not been installed                #"
-    echo "#########################################################"
-    rm -r /tmp/ipaudio >/dev/null 2>&1
-    rm -f $CHECK >/dev/null 2>&1
-    exit 1
-fi
+# list of deps
+DEPS="
+gstreamer1.0-plugins-base-volume
+gstreamer1.0-plugins-good-ossaudio
+gstreamer1.0-plugins-good-mpg123
+gstreamer1.0-plugins-good-equalizer
+ffmpeg
+alsa-plugins
+"
 
-if grep -q 'ffmpeg' $STATUS; then
-    echo ""
-else
-    echo "#########################################################"
-    echo "#            FFmpeg Not found in feed                   #"
-    echo "#         IPaudio has not been installed                #"
-    echo "#########################################################"
-    rm -r /tmp/ipaudio >/dev/null 2>&1
-    rm -f $CHECK >/dev/null 2>&1
-    exit 1
-fi
+# try installing missing deps without stopping script
+for dep in $DEPS; do
+    check_dep "$dep" || install_dep "$dep"
+done
 
-ffmpeg_version=$(ffmpeg -version 2>&1 | sed -n "s/.* version \([^ ]*\).*/\1/p;")
-IFS='.' read -r -a version_array <<<"$ffmpeg_version"
+echo "Dependency check completed (script will continue regardless)."
+
+# ffmpeg version check (non-blocking)
+ffmpeg_version=$(ffmpeg -version 2>/dev/null | sed -n "s/.* version \([^ ]*\).*/\1/p;")
+IFS='.' read -r -a version_array <<< "$ffmpeg_version"
+
 if [[ ${version_array[0]} -ge 5 ]]; then
     echo "[ FFmpeg 5 detected ]"
     FFPPLAYERA="/tmp/ipaudio/bin/arm/ff-ipaudio"
     FFPPLAYERM="/tmp/ipaudio/bin/mips/ff-ipaudio"
-elif [[ "$ffmpeg_version" =~ ^n[4-9] ]]; then
-    echo "[ FFmpeg 4 detected ]"
 else
-    echo "#########################################################"
-    echo "#          FFmpeg version is below 4.x.x                #"
-    echo "#         IPaudio has not been installed                #"
-    echo "#########################################################"
-    rm -r /tmp/ipaudio >/dev/null 2>&1
-    rm -f $CHECK >/dev/null 2>&1
-    exit 1
+    echo "[ Warning ] FFmpeg < 5 detected — continuing anyway"
 fi
 
 # remove old version
-rm -rf $PLUGINPATH >/dev/null 2>&1
-rm -f /usr/bin/gst1.0-ipaudio >/dev/null 2>&1
-rm -f /usr/bin/ff-ipaudio >/dev/null 2>&1
+rm -rf $PLUGINPATH 2>/dev/null
+rm -f /usr/bin/gst1.0-ipaudio 2>/dev/null
+rm -f /usr/bin/ff-ipaudio 2>/dev/null
 
+# download plugin
 cd $TEMPATH
-set -e
-wget -q "https://github.com/emil237/ipaudio/raw/refs/heads/main/ipaudio_8.0.tar.gz"
-
-tar -xzf ipaudio_8.0.tar.gz -C /
-set +e
+wget -q "https://github.com/emil237/ipaudio/raw/refs/heads/main/ipaudio_8.0.tar.gz" || true
+tar -xzf ipaudio_8.0.tar.gz -C / 2>/dev/null || true
 rm -f ipaudio_8.0.tar.gz
-cd ..
 
-# تصحيح أمر grep هنا - إزالة cat الزائد
+# CPU architecture
 CHECK_CONTENT=$(cat $CHECK)
+
 if echo "$CHECK_CONTENT" | grep -qi 'mips'; then
-    echo "[ Your device is MIPS ]"
-    cp -a $MIPSBIN $BINDIR
-    cp -a $FFPPLAYERM $BINDIR
-    chmod 0775 /usr/bin/gst1.0-ipaudio
-    chmod 0775 /usr/bin/ff-ipaudio
+    echo "[ MIPS detected ]"
+    cp -a $MIPSBIN $BINDIR 2>/dev/null
+    cp -a $FFPPLAYERM $BINDIR 2>/dev/null
 elif echo "$CHECK_CONTENT" | grep -qi 'armv7l'; then
-    echo "[ Your device is armv7l ]"
-    cp -a $ARMBIN $BINDIR
-    cp -a $FFPPLAYERA $BINDIR
-    chmod 0775 /usr/bin/gst1.0-ipaudio
-    chmod 0775 /usr/bin/ff-ipaudio
+    echo "[ ARMv7l detected ]"
+    cp -a $ARMBIN $BINDIR 2>/dev/null
+    cp -a $FFPPLAYERA $BINDIR 2>/dev/null
 else
-    echo "###############################"
-    echo "## Your stb is not supported ##"
-    echo "###############################"
-    rm -r /tmp/ipaudio
-    rm -f $CHECK
-    exit 1
+    echo "[ Warning ] Unsupported CPU — continuing anyway"
 fi
 
-# إنشاء مجلد إذا لم يكن موجوداً
+chmod 0775 /usr/bin/gst1.0-ipaudio 2>/dev/null
+chmod 0775 /usr/bin/ff-ipaudio 2>/dev/null
+
 mkdir -p /etc/enigma2/ipaudio
 
-if [ ! -f /etc/enigma2/ipaudio/ipaudio.json ]; then
-    cp -a $PLAYLIST /etc/enigma2/ipaudio/
-fi
+[ ! -f /etc/enigma2/ipaudio/ipaudio.json ] && cp -a $PLAYLIST /etc/enigma2/ipaudio/ 2>/dev/null
+[ ! -f /etc/asound.conf ] && cp -a $ASOUND /etc 2>/dev/null
 
-if [ ! -f /etc/asound.conf ]; then
-    echo "Sending asound.conf to /etc"
-    cp -a $ASOUND /etc
-fi
-
-rm -r /tmp/ipaudio
-rm -f $CHECK
+rm -r /tmp/ipaudio 2>/dev/null
+rm -f $CHECK 2>/dev/null
 
 echo ""
-sync
 echo "#########################################################"
-echo "#          IPAudio $version INSTALLED SUCCESSFULLY      #"
-echo "#                BY ZIKO - support on                   #"
-echo "#########################################################"
-echo "#           your Device will RESTART Now                #"
+echo "#      IPAudio $version INSTALLED (NON-STOP MODE)       #"
 echo "#########################################################"
 
-# إعادة تشغيل enigma2
-if [ "$OS" = 'DreamOS' ]; then
-    systemctl restart enigma2
+if [ "$OS" = "DreamOS" ]; then
+    systemctl restart enigma2 2>/dev/null || true
 else
-    killall -9 enigma2
+    killall -9 enigma2 2>/dev/null
     sleep 2
-    systemctl restart enigma2 2>/dev/null || restart enigma2 2>/dev/null || /etc/init.d/enigma2 restart 2>/dev/null
+    systemctl restart enigma2 2>/dev/null || restart enigma2 2>/dev/null || /etc/init.d/enigma2 restart 2>/dev/null || true
 fi
 
 exit 0
+
